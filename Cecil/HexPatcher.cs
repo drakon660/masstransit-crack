@@ -1,3 +1,4 @@
+using System.Reflection.Emit;
 using System.Reflection.PortableExecutable;
 using Mono.Cecil;
 
@@ -185,9 +186,11 @@ public class HexPatcher
             writer.Write((ushort)1);           // MaxStackSize = 1
             writer.Write((int)2);              // CodeSize = 2
             writer.Write((int)0);              // LocalVarSigTok = 0
-            writer.Write((byte)0x17);          // ldc.i4.1
-            writer.Write((byte)0x2A);          // ret
+            writer.Write((byte)OpCodes.Ldc_I4_1.Value);  // ldc.i4.1 (0x17)
+            writer.Write((byte)OpCodes.Ret.Value);    // ret (0x2A)
         }
+        
+        
 
         Console.WriteLine();
         Console.WriteLine("Hex-patched successfully!");

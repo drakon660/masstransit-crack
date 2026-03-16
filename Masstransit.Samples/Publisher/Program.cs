@@ -20,6 +20,7 @@ builder.Services.AddCarter();
 
 builder.Services.AddMassTransit(x =>
 {
+    x.DisableUsageTelemetry();
     x.UsingRabbitMq((context, cfg) =>
     {
         cfg.Host("localhost", "/", h =>

@@ -17,7 +17,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<OrderSubmittedConsumer>();
-
+    x.DisableUsageTelemetry();
     x.UsingRabbitMq((context, cfg) =>
     {
         cfg.Host("localhost", "/", h =>
