@@ -1,0 +1,16 @@
+@OrdersService_HostAddress = http://localhost:5196
+
+GET {{OrdersService_HostAddress}}/orders
+Accept: application/json
+
+###
+
+POST {{OrdersService_HostAddress}}/orders
+Content-Type: application/json
+
+{
+  "productName": "Keyboard",
+  "quantity": 3
+}
+
+###

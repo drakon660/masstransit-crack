@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(cd /F/src/masstransit-crack && find . -type f -name \"*.md\" -not -path \"./.git/*\" | xargs cat 2>/dev/null)",
+      "Bash(cd F:/src/masstransit-crack && dotnet new classlib -n Contracts -o Contracts --framework net10.0 && dotnet new webapi -n Publisher -o Publisher --framework net10.0 && dotnet new webapi -n Consumer -o Consumer --framework net10.0)",
+      "Bash(cd F:/src/masstransit-crack && dotnet add Publisher/Publisher.csproj package MassTransit.RabbitMQ && dotnet add Consumer/Consumer.csproj package MassTransit.RabbitMQ && dotnet add Publisher/Publisher.csproj reference Contracts/Contracts.csproj && dotnet add Consumer/Consumer.csproj reference Contracts/Contracts.csproj)",
+      "Bash(cd:*)"
+    ]
+  }
+}

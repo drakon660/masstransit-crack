@@ -1,0 +1,9 @@
+# tye2 application configuration file
+# read all about it at https://www.tye2.org/
+#
+name: masstransit.samples
+services:
+- name: publisher
+  project: Publisher/Publisher.csproj
+- name: consumer
+  project: Consumer/Consumer.csproj
