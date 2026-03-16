@@ -1,17 +1,18 @@
+using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
 namespace Cecil;
 
-public class ReflectionHexFinder
+public class ReflectionHexPatcher
 {
     private readonly string _assemblyPath;
     private readonly string _namespace;
     private readonly string _typeName;
     private readonly string _methodName;
 
-    public ReflectionHexFinder(string assemblyPath, string @namespace, string typeName, string methodName)
+    public ReflectionHexPatcher(string assemblyPath, string @namespace, string typeName, string methodName)
     {
         _assemblyPath = assemblyPath;
         _namespace = @namespace;
@@ -19,7 +20,7 @@ public class ReflectionHexFinder
         _methodName = methodName;
     }
 
-    public HexPatcher.MethodInfo? FindMethod()
+    public MethodLocation? FindMethod()
     {
         if (!File.Exists(_assemblyPath))
         {
@@ -95,7 +96,7 @@ public class ReflectionHexFinder
 
         Console.WriteLine($"Method RVA: 0x{methodRva:X}");
 
-        // Get IL bytes via PEReader
+        // Get IL info via PEReader
         var methodBody = peReader.GetMethodBody(methodRva);
         var ilBytes = methodBody.GetILBytes()!;
 
@@ -104,7 +105,7 @@ public class ReflectionHexFinder
         Console.WriteLine($"LocalSignature: 0x{(methodBody.LocalSignature.IsNil ? 0 : MetadataTokens.GetToken(methodBody.LocalSignature)):X}");
         Console.WriteLine($"IL bytes: {BitConverter.ToString(ilBytes).Replace("-", " ")}");
 
-        // Convert RVA to file offset
+        // Resolve file offset
         var sections = peReader.PEHeaders.SectionHeaders;
 
         foreach (var section in sections)
@@ -113,13 +114,12 @@ public class ReflectionHexFinder
             {
                 var methodOffset = methodRva - section.VirtualAddress + section.PointerToRawData;
 
-                // Read header byte to determine tiny vs fat
                 stream.Seek(methodOffset, SeekOrigin.Begin);
                 var headerByte = (byte)stream.ReadByte();
                 bool isTiny = (headerByte & 0x03) == 0x02;
                 int ilOffset = isTiny ? methodOffset + 1 : methodOffset + 12;
 
-                var info = new HexPatcher.MethodInfo
+                var info = new MethodLocation
                 {
                     MethodOffset = methodOffset,
                     IlOffset = ilOffset,
@@ -133,17 +133,57 @@ public class ReflectionHexFinder
                     Rva = methodRva
                 };
 
-                Console.WriteLine();
-                Console.WriteLine($"PE Section: {section.Name}");
-                Console.WriteLine($"  Method file offset: 0x{methodOffset:X} ({methodOffset} bytes)");
-                Console.WriteLine($"  Method header: {(isTiny ? "Tiny (1 byte)" : "Fat (12 bytes)")}");
-                Console.WriteLine($"  IL code offset: 0x{ilOffset:X} ({ilOffset} bytes)");
-
+                info.Print();
                 return info;
             }
         }
 
         Console.WriteLine("Could not resolve RVA to file offset.");
         return null;
+    }
+
+    public void PatchReturnTrue(MethodLocation info, string? outputPath = null)
+    {
+        var target = outputPath ?? _assemblyPath;
+
+        if (target != _assemblyPath)
+            File.Copy(_assemblyPath, target, true);
+
+        using var writer = new BinaryWriter(File.Open(target, FileMode.Open, FileAccess.Write));
+
+        if (info.IsTinyHeader)
+        {
+            // Tiny header: (codeSize << 2) | 0x02, codeSize=2 => 0x0A
+            writer.Seek(info.MethodOffset, SeekOrigin.Begin);
+            writer.Write((byte)0x0A);                         // tiny header, code size = 2
+            writer.Write((byte)OpCodes.Ldc_I4_1.Value);      // ldc.i4.1 (0x17)
+            writer.Write((byte)OpCodes.Ret.Value);            // ret (0x2A)
+        }
+        else
+        {
+            // Fat header layout:
+            //   byte 0: lower 2 bits = format (0x3=fat), bit 2 = MoreSects, bit 3 = InitLocals
+            //   byte 1: upper nibble = header size in dwords (0x30 = 12 bytes)
+            //   bytes 2-3: MaxStackSize
+            //   bytes 4-7: CodeSize
+            //   bytes 8-11: LocalVarSigTok
+            //   bytes 12+: IL body
+
+            // Clear MoreSects (bit 2) and InitLocals (bit 3), keep fat format (0x03)
+            byte cleanedFlags = (byte)((info.OriginalFlags & ~0x0C) | 0x03);
+
+            writer.Seek(info.MethodOffset, SeekOrigin.Begin);
+            writer.Write(cleanedFlags);                       // flags byte 0
+            writer.Write((byte)0x30);                         // flags byte 1 (header size = 3 dwords)
+            writer.Write((ushort)1);                          // MaxStackSize = 1
+            writer.Write((int)2);                             // CodeSize = 2
+            writer.Write((int)0);                             // LocalVarSigTok = 0
+            writer.Write((byte)OpCodes.Ldc_I4_1.Value);      // ldc.i4.1 (0x17)
+            writer.Write((byte)OpCodes.Ret.Value);            // ret (0x2A)
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Hex-patched successfully!");
+        Console.WriteLine($"  Patched file: {target}");
     }
 }
