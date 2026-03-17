@@ -75,7 +75,6 @@ node_modules/
 .vscode
 *.ntvs*
 *.njsproj
-*.sln
 *.sw?
 # OS specific
 .DS_Store
